@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan History — VulnScanner</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #111;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #222;
+        }
+
+        .history-table th {
+            background: #1a1a1a;
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid #222;
+        }
+
+        .history-table td {
+            padding: 14px 16px;
+            font-size: 14px;
+            border-bottom: 1px solid #1a1a1a;
+            color: #ccc;
+        }
+
+        .history-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .history-table tr:hover td {
+            background: #161616;
+        }
+
+        .score-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .score-good { background: #0a2a1a; color: #00ff88; border: 1px solid #00ff88; }
+        .score-warn { background: #2a2000; color: #ffcc00; border: 1px solid #ffcc00; }
+        .score-bad  { background: #2a0000; color: #ff4444; border: 1px solid #ff4444; }
+
+        .url-cell {
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #00bfff;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #444;
+        }
+
+        .empty-state p {
+            font-size: 15px;
+            margin-bottom: 16px;
+        }
+
+        .back-btn {
+            display: inline-block;
+            background: #00ff88;
+            color: #000;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .page-header h2 {
+            font-size: 22px;
+            color: #fff;
+        }
+
+        .counts {
+            display: flex;
+            gap: 6px;
+        }
+
+        .cnt {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .cnt-c { background: #ff2222; color: #fff; }
+        .cnt-h { background: #ff6600; color: #fff; }
+        .cnt-m { background: #ffcc00; color: #000; }
+        .cnt-i { background: #00bfff; color: #000; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <h1>&#x1F6E1; VulnScanner</h1>
+    <span>Web Vulnerability Scanner</span>
+    <a href="/logout" style="margin-left:auto; color:#555; font-size:13px; text-decoration:none;">Logout</a>
+</nav>
+
+<div class="container">
+    <div class="page-header">
+        <h2>Scan History</h2>
+        <a href="/" class="back-btn">New Scan</a>
+    </div>
+
+    {% if scans %}
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Target URL</th>
+                <th>Score</th>
+                <th>Findings</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for scan in scans %}
+            <tr>
+                <td style="color:#555; white-space:nowrap;">{{ scan.date }}</td>
+                <td class="url-cell">{{ scan.url }}</td>
+                <td>
+                    <span class="score-pill {% if scan.score >= 85 %}score-good{% elif scan.score >= 60 %}score-warn{% else %}score-bad{% endif %}">
+                        {{ scan.score }}/100
+                    </span>
+                </td>
+                <td>
+                    <div class="counts">
+                        {% if scan.critical > 0 %}<span class="cnt cnt-c">{{ scan.critical }} Critical</span>{% endif %}
+                        {% if scan.high > 0 %}<span class="cnt cnt-h">{{ scan.high }} High</span>{% endif %}
+                        {% if scan.medium > 0 %}<span class="cnt cnt-m">{{ scan.medium }} Medium</span>{% endif %}
+                        {% if scan.info > 0 %}<span class="cnt cnt-i">{{ scan.info }} Info</span>{% endif %}
+                        {% if scan.critical == 0 and scan.high == 0 and scan.medium == 0 and scan.info == 0 %}
+                            <span style="color:#444">No findings</span>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% else %}
+    <div class="empty-state">
+        <p>No scans yet — run your first scan!</p>
+        <a href="/" class="back-btn">Start Scanning</a>
+    </div>
+    {% endif %}
+
+</div>
+</body>
+</html>

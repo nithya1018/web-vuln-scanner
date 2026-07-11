@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Vulnerability Scanner</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<nav>
+    <h1>&#x1F6E1; VulnScanner</h1>
+    <span>Web Vulnerability Scanner</span>
+    <div style="margin-left:auto; display:flex; gap:20px; align-items:center;">
+        <a href="/history" style="color:#888; font-size:13px; text-decoration:none;">History</a>
+        <a href="/logout" style="color:#555; font-size:13px; text-decoration:none;">Logout</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="hero">
+        <h2>Scan for Web Vulnerabilities</h2>
+        <p>Detect XSS, SQL Injection, missing headers, and open ports instantly</p>
+    </div>
+
+    <div class="scan-box">
+        <label>Target URL</label>
+        <div class="input-row">
+            <input type="text" id="urlInput" placeholder="http://example.com?id=1" />
+            <button id="scanBtn" onclick="startScan()">Scan</button>
+        </div>
+        <div class="checkbox-row">
+            <input type="checkbox" id="deepScanCheck" />
+            <span>Deep scan — crawl entire site to find all pages automatically</span>
+        </div>
+        <div class="modules">
+            <span class="module-tag">Security Headers</span>
+            <span class="module-tag">SQL Injection</span>
+            <span class="module-tag">XSS</span>
+            <span class="module-tag">Port Scan</span>
+        </div>
+    </div>
+
+    <div class="progress-box" id="progressBox">
+        <h3>Scanning in progress...</h3>
+        <div class="progress-step" id="step1"><div class="dot"></div> Checking security headers</div>
+        <div class="progress-step" id="step2"><div class="dot"></div> Scanning for SQL Injection</div>
+        <div class="progress-step" id="step3"><div class="dot"></div> Scanning for XSS</div>
+        <div class="progress-step" id="step4"><div class="dot"></div> Scanning open ports</div>
+        <div class="progress-step" id="step5"><div class="dot"></div> Generating report</div>
+    </div>
+
+    <div class="results" id="results"></div>
+</div>
+
+<script>
+async function startScan() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) { alert('Please enter a URL'); return; }
+
+    document.getElementById('scanBtn').disabled = true;
+    document.getElementById('scanBtn').textContent = 'Scanning...';
+    document.getElementById('progressBox').style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('results').innerHTML = '';
+
+    const steps = ['step1', 'step2', 'step3', 'step4', 'step5'];
+    let i = 0;
+    const interval = setInterval(() => {
+        if (i > 0) document.getElementById(steps[i-1]).className = 'progress-step done';
+        if (i < steps.length) {
+            document.getElementById(steps[i]).className = 'progress-step active';
+            i++;
+        }
+    }, 1500);
+
+    const deepScan = document.getElementById('deepScanCheck').checked;
+
+    try {
+        const response = await fetch('/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url, deep_scan: deepScan })
+        });
+        const data = await response.json();
+
+        clearInterval(interval);
+        steps.forEach(s => document.getElementById(s).className = 'progress-step done');
+
+        window.lastData = data;
+
+        setTimeout(() => {
+            document.getElementById('progressBox').style.display = 'none';
+            showResults(data.technical, url);
+        }, 500);
+
+    } catch (err) {
+        clearInterval(interval);
+        alert('Scan failed: ' + err.message);
+    }
+
+    document.getElementById('scanBtn').disabled = false;
+    document.getElementById('scanBtn').textContent = 'Scan';
+}
+
+function showResults(data, url) {
+    const simple = window.lastData.simple;
+
+    const critical = [...(data.sqli||[])].filter(f => f.severity === 'Critical').length;
+    const high = [...(data.xss||[])].filter(f => f.severity === 'High').length;
+    const medium = [...(data.headers||[])].filter(f => f.severity === 'Medium').length;
+    const info = [...(data.ports||[])].filter(f => f.severity === 'Info').length;
+
+    const scoreColor = simple.score >= 85 ? '#00ff88' : simple.score >= 60 ? '#ffcc00' : '#ff2222';
+
+    let html = `
+        <div class="view-toggle">
+            <button class="toggle-btn active" id="simpleBtn" onclick="switchView('simple')">Simple View</button>
+            <button class="toggle-btn" id="techBtn" onclick="switchView('tech')">Technical View</button>
+        </div>
+
+        <div id="simpleView">
+            <div class="score-card">
+                <div class="score-circle" style="border-color:${scoreColor}; color:${scoreColor}">${simple.score}</div>
+                <div>
+                    <div class="score-verdict" style="color:${scoreColor}">${simple.verdict}</div>
+                    <div class="score-sub">Overall security score out of 100</div>
+                </div>
+            </div>
+
+            ${simple.findings.length === 0 ? `<div class="section"><div class="none-found">No issues found — your site looks good!</div></div>` :
+              simple.findings.map(f => `
+                <div class="simple-card">
+                    <div class="simple-header">
+                        <span class="badge badge-${f.risk}">${f.risk}</span>
+                        <span class="simple-title">${f.title}</span>
+                    </div>
+                    <p class="simple-explain">${f.explain}</p>
+                    <p class="simple-fix"><strong>What to do:</strong> ${f.fix}</p>
+                </div>
+              `).join('')
+            }
+        </div>
+
+        <div id="techView" style="display:none;">
+            ${data.pages_scanned ? `<p style="color:#666; font-size:13px; margin-bottom:14px;">Scanned ${data.pages_scanned} page(s) on this site</p>` : ''}
+            <div class="summary-bar">
+                <div class="summary-card"><div class="count count-critical">${critical}</div><div class="label">Critical</div></div>
+                <div class="summary-card"><div class="count count-high">${high}</div><div class="label">High</div></div>
+                <div class="summary-card"><div class="count count-medium">${medium}</div><div class="label">Medium</div></div>
+                <div class="summary-card"><div class="count count-info">${info}</div><div class="label">Info</div></div>
+            </div>
+
+            ${renderSection('Security Headers', data.headers)}
+            ${renderSection('SQL Injection', data.sqli)}
+            ${renderSection('XSS', data.xss)}
+            ${renderSection('Open Ports', data.ports)}
+        </div>
+
+        <div style="text-align:center; margin-top:20px; margin-bottom:40px;">
+            <a href="/download-pdf" style="background:#00ff88; color:#000; padding:12px 32px; border-radius:8px; font-weight:700; text-decoration:none; font-size:15px;">
+                Download PDF Report
+            </a>
+        </div>
+    `;
+
+    document.getElementById('results').innerHTML = html;
+    document.getElementById('results').style.display = 'block';
+}
+
+function switchView(view) {
+    document.getElementById('simpleView').style.display = view === 'simple' ? 'block' : 'none';
+    document.getElementById('techView').style.display = view === 'tech' ? 'block' : 'none';
+    document.getElementById('simpleBtn').className = view === 'simple' ? 'toggle-btn active' : 'toggle-btn';
+    document.getElementById('techBtn').className = view === 'tech' ? 'toggle-btn active' : 'toggle-btn';
+}
+
+function renderSection(title, findings) {
+    let html = `<div class="section"><h3>${title}</h3>`;
+    if (!findings || findings.length === 0) {
+        html += `<div class="none-found">No issues found</div>`;
+    } else {
+        findings.forEach(f => {
+            const detail = f.detail || f.param || f.service || '';
+            html += `
+                <div class="finding">
+                    <span class="badge badge-${f.severity}">${f.severity}</span>
+                    <span>${f.type} — ${detail}</span>
+                </div>`;
+        });
+    }
+    html += `</div>`;
+    return html;
+}
+</script>
+
+</body>
+</html>
