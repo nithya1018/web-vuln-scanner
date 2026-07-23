@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, send_file
 from urllib.parse import urlparse, parse_qs
 from modules.header_checker import check_headers
 from modules.sqli_scanner import scan_sqli
@@ -7,50 +7,17 @@ from modules.port_scanner import scan_ports
 from modules.pdf_report import generate_pdf
 from modules.simplify import build_simple_report
 from modules.crawler import crawl, get_testable_urls
-from functools import wraps
-from config import USERNAME, PASSWORD, SECRET_KEY
 from datetime import datetime
 import json
 import os
 
 app = Flask(__name__)
-app.secret_key = SECRET_KEY
 
-# ── Auth decorator ──────────────────────────────────────────
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated
-
-# ── Login routes ────────────────────────────────────────────
-@app.route('/login', methods=['GET'])
-def login():
-    return render_template('login.html', error=None)
-
-@app.route('/login', methods=['POST'])
-def login_post():
-    data = request.get_json()
-    if data.get('username') == USERNAME and data.get('password') == PASSWORD:
-        session['logged_in'] = True
-        return jsonify({'success': True})
-    return jsonify({'success': False, 'error': 'Invalid username or password'})
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
-# ── Main routes ─────────────────────────────────────────────
 @app.route('/')
-@login_required
 def index():
     return render_template('index.html')
 
 @app.route('/scan', methods=['POST'])
-@login_required
 def scan():
     data = request.get_json()
     url = data.get('url', '')
@@ -91,11 +58,9 @@ def scan():
 
     os.makedirs("reports", exist_ok=True)
 
-    # Save latest
     with open("reports/latest.json", "w") as f:
         json.dump({'url': url, 'findings': results, 'simple': simple_report}, f)
 
-    # Save to history
     history_path = "reports/history.json"
     history = []
     if os.path.exists(history_path):
@@ -113,14 +78,13 @@ def scan():
         'info': sum(1 for f in results.get('ports', []) if f['severity'] == 'Info'),
     })
 
-    history = history[:20]  # Keep last 20 scans only
+    history = history[:20]
     with open(history_path, "w") as f:
         json.dump(history, f, indent=2)
 
     return jsonify({'technical': results, 'simple': simple_report})
 
 @app.route('/download-pdf')
-@login_required
 def download_pdf():
     with open("reports/latest.json") as f:
         data = json.load(f)
@@ -128,7 +92,6 @@ def download_pdf():
     return send_file(path, as_attachment=True, download_name="vulnerability_report.pdf")
 
 @app.route('/history')
-@login_required
 def history():
     history_path = "reports/history.json"
     scans = []
